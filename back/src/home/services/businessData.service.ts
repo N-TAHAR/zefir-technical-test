@@ -4,14 +4,14 @@ import { DeepPartial } from 'typeorm';
 import { BusinessData } from '../entities/businessData.entity';
 import BusinessDataCustomRepository from '../repositories/businessData.custom.repository';
 import HomeService from './home.service';
-
+import calculateServiceFee from '../utils/feeCalculator.util';
 @Injectable()
 export default class BusinessDataService {
   constructor(
     @InjectRepository(BusinessDataCustomRepository)
     private readonly businessDataRepository: BusinessDataCustomRepository,
     private readonly homeService: HomeService
-  ) {}
+  ) { }
 
   async generateBusinessDataForHome(
     homeUuid: string,
@@ -22,19 +22,34 @@ export default class BusinessDataService {
     // TODO : write business data logic to compute :
     //  - serviceFees (see README)
     //  - negotiation margin (see README)
+    const home = await this.homeService.findHome(homeUuid)
+    const negotiationMargin = this.computeNegotiationMargin(finalOfferPrice, targetSalePrice);
+    const serviceFees = this.computeServiceFees(finalOfferPrice, home.zipcode);
 
     const businessData = await this.createBusinessData({
       homeUuid,
       initialOfferPrice,
       finalOfferPrice,
       targetSalePrice,
-      // serviceFees
-      // negotiationMargin
+      serviceFees,
+      negotiationMargin
     });
     await this.homeService.updateHome(homeUuid, {
       businessDataUuid: businessData.uuid,
     });
     return businessData;
+  }
+
+  computeNegotiationMargin(finalOfferPrice: number, targetSalePrice: number, maxNegotiationMargin: number = 0.07): number {
+    const relativeMargin = (targetSalePrice / finalOfferPrice) - 1;
+    const minMargin = Math.min(relativeMargin, maxNegotiationMargin).toFixed(3);
+
+    return Math.abs(Number(minMargin));
+  }
+
+  computeServiceFees(finalOfferPrice: number, zipCode: string): number {
+    const regionCode = zipCode.substring(0, 2);
+    return calculateServiceFee(finalOfferPrice, regionCode);
   }
 
   async findBusinessDataByHomeUuid(homeUuid: string): Promise<BusinessData> {
