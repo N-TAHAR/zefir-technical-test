@@ -9,7 +9,15 @@ export const appFactory = (
   return {
     imports: [
       ConfigModule.forRoot({ ...cfgOpts, isGlobal: true }),
-      TypeOrmModule.forRoot(),
+      TypeOrmModule.forRoot({
+        type: 'sqlite',
+        database: ':memory:',
+        dropSchema: true,
+        synchronize: true,
+        logging: false,
+        entities: [__dirname + '/../**/*.entity.{js,ts}'],
+        keepConnectionAlive: true
+      }),
       HomeModule,
     ],
   };
